@@ -191,33 +191,63 @@ def model_pk_filterer(pk_kwarg: str = "pk") -> Filterer:
     return inner
 
 
-def model_mutator(form: Type[forms.ModelForm]) -> Mutator:
-    default_encoding = settings.DEFAULT_CHARSET
+def json_parser(ctx: Context) -> Optional[Tuple[dict, dict]]:
+    if not JSON_CONTENT_TYPE_RE.match(ctx.request.content_type):
+        return None
+
+    encoding = ctx.request.encoding or settings.DEFAULT_CHARSET
+    body_reader = (
+        BytesIO(ctx.request.body) if hasattr(ctx.request, "_body") else ctx.request
+    )
+    return (
+        json.load(codecs.getreader(encoding)(body_reader)),
+        MultiValueDict(),
+    )
+
+
+def multi_part_parser(ctx: Context) -> Optional[Tuple[dict, dict]]:
+    if not ctx.request.content_type.startswith("multipart"):
+        return None
+
+    encoding = ctx.request.encoding or settings.DEFAULT_CHARSET
+    body_reader = (
+        BytesIO(ctx.request.body) if hasattr(ctx.request, "_body") else ctx.request
+    )
+    return MultiPartParser(
+        ctx.request.META,
+        body_reader,
+        ImmutableList(ctx.request.upload_handlers),
+        encoding,
+    ).parse()
+
+
+def urlencoded_form_parser(ctx: Context) -> Optional[Tuple[dict, dict]]:
+    if not ctx.request.content_type.startswith("application/x-www-form-urlencoded"):
+        return None
+
+    encoding = ctx.request.encoding or settings.DEFAULT_CHARSET
+    body_reader = (
+        BytesIO(ctx.request.body) if hasattr(ctx.request, "_body") else ctx.request
+    )
+    return QueryDict(body_reader.read(), encoding=encoding), MultiValueDict()
+
+
+def model_mutator(
+    form: Type[forms.ModelForm],
+    *parsers: Callable[[Context], Optional[Tuple[dict, dict]]]
+) -> Mutator:
+    if not parsers:
+        parsers = (json_parser, multi_part_parser, urlencoded_form_parser)
 
     def inner(ctx: Context, instance: Any) -> Tuple[Any, Optional[HttpResponseBase]]:
-        encoding = ctx.request.encoding or default_encoding
-        body_reader = (
-            BytesIO(ctx.request.body) if hasattr(ctx.request, "_body") else ctx.request
-        )
-        data, files = QueryDict(encoding=encoding), MultiValueDict()
+        data, files = {}, {}
+        for parser in parsers:
+            parsed = parser(ctx)
+            if parsed is None:
+                continue
 
-        if ctx.request.content_type.startswith("multipart"):
-            data, files = MultiPartParser(
-                ctx.request.META,
-                body_reader,
-                ImmutableList(ctx.request.upload_handlers),
-                encoding,
-            ).parse()
-        elif JSON_CONTENT_TYPE_RE.match(ctx.request.content_type):
-            data, files = (
-                json.load(codecs.getreader(encoding)(body_reader)),
-                MultiValueDict(),
-            )
-        elif ctx.request.content_type == "application/x-www-form-urlencoded":
-            data, files = (
-                QueryDict(body_reader.read(), encoding=encoding),
-                MultiValueDict(),
-            )
+            data, files = parsed
+            break
 
         form_instance = form(data=data, files=files, instance=instance)
         if form_instance.is_valid():
