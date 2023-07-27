@@ -123,12 +123,14 @@ def noop_layer(service: Service) -> Service:
 # default_exception_handler is a handler that returns a JSON response with the exception message and status code.
 def default_exception_handler(ctx: Context) -> HttpResponseBase:
     exception = ctx[EXCEPTION_RESULT_CONTEXT_KEY]
-    message = str(exception)
     status_code = (
         500 if not hasattr(exception, "status_code") else exception.status_code
     )
     code = status_code if not hasattr(exception, "code") else exception.code
     details = {} if not hasattr(exception, "details") else exception.details
+    message = (
+        str(exception) if status_code != 500 else "internal server error"
+    )  # hide the exception message if it's a 500 error
     return JsonResponse(
         {"message": message, "code": code, "details": details}, status=status_code
     )
