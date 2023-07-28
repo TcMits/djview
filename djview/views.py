@@ -158,18 +158,27 @@ def exception_layer(
     return inner
 
 
-# method_layer is a layer that only calls the service function if the request method matches the given method.
-def method_layer(method: str, *outers: Layer, service: Service) -> Layer:
-    method_service = into_service(*outers, service=service)
+# case_layer is a layer that only calls the service function if the condition is true.
+def case_layer(
+    condition: Callable[[Context], bool], *outers: Layer, service: Service
+) -> Layer:
+    condition_service = into_service(*outers, service=service)
 
     def inner(service: Service) -> Service:
         @wraps(service)
         def wrapper(ctx: Context) -> HttpResponseBase:
-            if ctx.request.method == method:
-                return method_service(ctx)
+            if condition(ctx):
+                return condition_service(ctx)
 
             return service(ctx)
 
         return wrapper
 
     return inner
+
+
+# method_layer is a layer that only calls the service function if the request method matches the given method.
+def method_layer(method: str, *outers: Layer, service: Service) -> Layer:
+    return case_layer(
+        lambda ctx: ctx.request.method == method, *outers, service=service
+    )

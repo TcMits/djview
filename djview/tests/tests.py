@@ -29,7 +29,7 @@ class ContextTestCase(SimpleTestCase):
         self.assertEqual(
             response.json(),
             {
-                "message": "Something went wrong",
+                "message": "internal server error",
                 "code": "SOMETHING_WENT_WRONG",
                 "details": {"foo": "bar"},
             },
@@ -58,7 +58,7 @@ class ContextTestCase(SimpleTestCase):
         self.assertEqual(
             response.json(),
             {
-                "message": "Something went wrong",
+                "message": "internal server error",
                 "code": "SOMETHING_WENT_WRONG",
                 "details": {"foo": "bar"},
             },
