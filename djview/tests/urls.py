@@ -114,7 +114,7 @@ urlpatterns = [
                     "POST",
                     service=create_service(
                         model_mutator(TestModelForm),
-                        model_serializer,
+                        model_serializer(),
                     ),
                 ),
                 service=view404,
@@ -130,7 +130,7 @@ urlpatterns = [
                 method_layer(
                     "GET",
                     service=detail_service(
-                        model_serializer,
+                        model_serializer(),
                         model_all_filterer(TestModel),
                         model_pk_filterer(),
                     ),
@@ -139,7 +139,7 @@ urlpatterns = [
                     "PATCH",
                     service=update_service(
                         model_mutator(TestModelForm),
-                        model_serializer,
+                        model_serializer(),
                         model_all_filterer(TestModel),
                         model_pk_filterer(),
                     ),

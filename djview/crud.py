@@ -124,24 +124,36 @@ def delete_service(mutater: Mutator, *filterers: Filterer) -> Service:
     return inner
 
 
-def model_serializer(_: Context, instance: Any) -> Tuple[str, Any]:
-    return "application/json", serializers.serialize("json", [instance])[1:-1]
+def model_serializer(**serialize_options: Any) -> Serializer:
+    def inner(_: Context, instance: Any) -> Tuple[str, Any]:
+        return (
+            "application/json",
+            serializers.serialize("json", [instance], **serialize_options)[1:-1],
+        )
+
+    return inner
 
 
-def model_list_serializer(meta_key: str = META_CONTEXT_KEY) -> Serializer:
+def model_list_serializer(
+    meta_key: str = META_CONTEXT_KEY, **serialize_options: Any
+) -> Serializer:
     def inner(ctx: Context, instances: Any) -> Tuple[str, Any]:
         meta: Optional[Dict[str, Any]] = ctx.get(meta_key)
         if meta is not None:
             content = OrderedDict(
                 {
                     **meta,
-                    "results": serializers.serialize("python", instances),
+                    "results": serializers.serialize(
+                        "python", instances, **serialize_options
+                    ),
                 }
             )
 
             return "application/json", json.dumps(content, cls=DjangoJSONEncoder)
 
-        return "application/json", serializers.serialize("json", instances)
+        return "application/json", serializers.serialize(
+            "json", instances, **serialize_options
+        )
 
     return inner
 
